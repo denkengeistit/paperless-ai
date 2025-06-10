@@ -11,7 +11,7 @@ class PaperlessService {
     this.tagCache = new Map();
     this.customFieldCache = new Map();
     this.lastTagRefresh = 0;
-    this.CACHE_LIFETIME = 3000; // 3 Sekunden
+    this.CACHE_LIFETIME = 1800000; // 30 minutes
   }
 
   initialize() {
