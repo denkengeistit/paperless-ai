@@ -270,4 +270,4 @@ class TagConsolidationService {
   }
 }
 
-module.exports = { TagConsolidationService }; 
+module.exports = TagConsolidationService; 
