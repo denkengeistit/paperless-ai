@@ -444,6 +444,11 @@ if (process.env.RAG_SERVICE_ENABLED === 'true') {
 // Add routes
 app.use('/api/tags', tagConsolidationRouter);
 
+// Add page routes
+app.get('/tag-consolidation', (req, res) => {
+  res.render('tag-consolidation');
+});
+
 /**
  * @swagger
  * /:
