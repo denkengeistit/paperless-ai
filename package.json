@@ -4,7 +4,8 @@
   "description": "AI based Tag, correspondent and meta data generation",
   "main": "server.js",
   "scripts": {
-    "test": "nodemon server.js"
+    "test": "nodemon server.js",
+    "debug": "DEBUG=* NODE_DEBUG=* nodemon --verbose server.js"
   },
   "keywords": [
     "paperless-ngx",
