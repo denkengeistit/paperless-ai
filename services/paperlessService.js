@@ -8,10 +8,7 @@ const { parse, isValid, parseISO, format } = require('date-fns');
 class PaperlessService {
   constructor() {
     this.client = null;
-    this.tagCache = new Map();
     this.customFieldCache = new Map();
-    this.lastTagRefresh = 0;
-    this.CACHE_LIFETIME = 1800000; // 30 minutes
   }
 
   initialize() {
@@ -49,154 +46,9 @@ class PaperlessService {
     }
   }
 
-
-  // Aktualisiert den Tag-Cache, wenn er älter als CACHE_LIFETIME ist
-  async ensureTagCache() {
-    const now = Date.now();
-    if (this.tagCache.size === 0 || (now - this.lastTagRefresh) > this.CACHE_LIFETIME) {
-      await this.refreshTagCache();
-    }
-  }
-
-  // Lädt alle existierenden Tags
-  async refreshTagCache() {
-    try {
-      console.log('[DEBUG] Refreshing tag cache...');
-      this.tagCache.clear();
-      let nextUrl = '/tags/';
-      while (nextUrl) {
-        const response = await this.client.get(nextUrl);
-        response.data.results.forEach(tag => {
-          this.tagCache.set(tag.name.toLowerCase(), tag);
-        });
-        nextUrl = response.data.next;
-      }
-      this.lastTagRefresh = Date.now();
-      console.log(`[DEBUG] Tag cache refreshed. Found ${this.tagCache.size} tags.`);
-    } catch (error) {
-      console.error('[ERROR] refreshing tag cache:', error.message);
-      throw error;
-    }
-  }
-
-  async initializeWithCredentials(apiUrl, apiToken) {
-    this.client = axios.create({
-      baseURL: apiUrl,
-      headers: {
-        'Authorization': `Token ${apiToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    // Test the connection
-    try {
-      await this.client.get('/');
-      return true;
-    } catch (error) {
-      console.error('[ERROR] Failed to initialize with credentials:', error.message);
-      this.client = null;
-      return false;
-    }
-  }
-
-  async createCustomFieldSafely(fieldName, fieldType, default_currency) {
-    try {
-      // Try to create the field first
-      const response = await this.client.post('/custom_fields/', { 
-        name: fieldName,
-        data_type: fieldType,
-        extra_data: {
-          default_currency: default_currency || null
-        }
-      });
-      const newField = response.data;
-      console.log(`[DEBUG] Successfully created custom field "${fieldName}" with ID ${newField.id}`);
-      this.customFieldCache.set(fieldName.toLowerCase(), newField);
-      return newField;
-    } catch (error) { 
-      if (error.response?.status === 400) {
-        await this.refreshCustomFieldCache();
-        const existingField = await this.findExistingCustomField(fieldName);
-        if (existingField) {
-          return existingField;
-        }
-      }
-      throw error; // When couldn't find the field, rethrow the error
-    }
-  }
-
-  async getExistingCustomFields(documentId) {
-    try {
-      const response = await this.client.get(`/documents/${documentId}/`);
-      console.log('[DEBUG] Document response custom fields:', response.data.custom_fields);
-      return response.data.custom_fields || [];
-    } catch (error) {
-      console.error(`[ERROR] fetching document ${documentId}:`, error.message);
-      return [];
-    }
-  }
-  
-  async findExistingCustomField(fieldName) {
-    const normalizedName = fieldName.toLowerCase();
-    
-    const cachedField = this.customFieldCache.get(normalizedName);
-    if (cachedField) {
-      console.log(`[DEBUG] Found custom field "${fieldName}" in cache with ID ${cachedField.id}`);
-      return cachedField;
-    }
-
-    try {
-      const response = await this.client.get('/custom_fields/', {
-        params: {
-          name__iexact: normalizedName  // Case-insensitive exact match
-        }
-      });
-
-      if (response.data.results.length > 0) {
-        const foundField = response.data.results[0];
-        console.log(`[DEBUG] Found existing custom field "${fieldName}" via API with ID ${foundField.id}`);
-        this.customFieldCache.set(normalizedName, foundField);
-        return foundField;
-      }
-    } catch (error) {
-      console.warn(`[ERROR] searching for custom field "${fieldName}":`, error.message);
-    }
-
-    return null;
-  }
-
-  async refreshCustomFieldCache() {
-    try {
-      console.log('[DEBUG] Refreshing custom field cache...');
-      this.customFieldCache.clear();
-      let nextUrl = '/custom_fields/';
-      while (nextUrl) {
-        const response = await this.client.get(nextUrl);
-        response.data.results.forEach(field => {
-          this.customFieldCache.set(field.name.toLowerCase(), field);
-        });
-        nextUrl = response.data.next;
-      }
-      this.lastCustomFieldRefresh = Date.now();
-      console.log(`[DEBUG] Custom field cache refreshed. Found ${this.customFieldCache.size} fields.`);
-    } catch (error) {
-      console.error('[ERROR] refreshing custom field cache:', error.message);
-      throw error;
-    }
-  }
-
-
   async findExistingTag(tagName) {
     const normalizedName = tagName.toLowerCase();
     
-    // 1. Zuerst im Cache suchen
-    const cachedTag = this.tagCache.get(normalizedName);
-    if (cachedTag) {
-      console.log(`[DEBUG] Found tag "${tagName}" in cache with ID ${cachedTag.id}`);
-      return cachedTag;
-    }
-
-    // 2. Direkte API-Suche
     try {
       const response = await this.client.get('/tags/', {
         params: {
@@ -207,7 +59,6 @@ class PaperlessService {
       if (response.data.results.length > 0) {
         const foundTag = response.data.results[0];
         console.log(`[DEBUG] Found existing tag "${tagName}" via API with ID ${foundTag.id}`);
-        this.tagCache.set(normalizedName, foundTag);
         return foundTag;
       }
     } catch (error) {
@@ -218,35 +69,28 @@ class PaperlessService {
   }
 
   async createTagSafely(tagName) {
-    const normalizedName = tagName.toLowerCase();
-    
     try {
-      // Versuche zuerst, den Tag zu erstellen
+      // Try to create the tag first
       const response = await this.client.post('/tags/', { name: tagName });
       const newTag = response.data;
       console.log(`[DEBUG] Successfully created tag "${tagName}" with ID ${newTag.id}`);
-      this.tagCache.set(normalizedName, newTag);
       return newTag;
     } catch (error) {
       if (error.response?.status === 400) {
-        // Bei einem 400er Fehler könnte der Tag bereits existieren
-        // Aktualisiere den Cache und suche erneut
-        await this.refreshTagCache();
-        
-        // Suche nochmal nach dem Tag
+        // If we get a 400 error, the tag might already exist
+        // Try to find it
         const existingTag = await this.findExistingTag(tagName);
         if (existingTag) {
           return existingTag;
         }
       }
-      throw error; // Wenn wir den Tag nicht finden konnten, werfen wir den Fehler weiter
+      throw error; // If we couldn't find the tag, rethrow the error
     }
   }
 
   async processTags(tagNames) {
     try {
       this.initialize();
-      await this.ensureTagCache();
   
       // Input validation
       if (!tagNames) {
@@ -528,7 +372,7 @@ class PaperlessService {
       
       // Hole die Tag-IDs für die definierten Tags
       const tagNames = process.env.TAGS.split(',').map(tag => tag.trim());
-      await this.ensureTagCache();
+      await this.processTags(tagNames);
       
       for (const tagName of tagNames) {
         const tag = await this.findExistingTag(tagName);
@@ -647,7 +491,7 @@ class PaperlessService {
       
       // Hole die Tag-IDs für die definierten Tags
       const tagNames = process.env.TAGS.split(',').map(tag => tag.trim());
-      await this.ensureTagCache();
+      await this.processTags(tagNames);
       
       for (const tagName of tagNames) {
         const tag = await this.findExistingTag(tagName);
