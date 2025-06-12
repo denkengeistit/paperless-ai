@@ -8,6 +8,7 @@ const AIServiceFactory = require('./services/aiServiceFactory');
 const documentModel = require('./models/document');
 const setupService = require('./services/setupService');
 const setupRoutes = require('./routes/setup');
+const tagConsolidationRouter = require('./routes/tagConsolidation');
 
 // Add environment variables for RAG service if not already set
 process.env.RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || 'http://localhost:8000';
@@ -439,6 +440,9 @@ if (process.env.RAG_SERVICE_ENABLED === 'true') {
     }
   });
 }
+
+// Add routes
+app.use('/api/tags', tagConsolidationRouter);
 
 /**
  * @swagger

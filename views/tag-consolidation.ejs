@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+
+<div class="container mt-4">
+  <h2>Tag Consolidation</h2>
+  
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Tag Analysis</h5>
+      <p class="card-text">Analyze your tags to find potential consolidations.</p>
+      <button id="analyzeTags" class="btn btn-primary">Analyze Tags</button>
+    </div>
+  </div>
+
+  <div id="analysisResults" class="d-none">
+    <h3>Consolidation Suggestions</h3>
+    <div id="suggestionsList" class="list-group">
+      <!-- Suggestions will be populated here -->
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('analyzeTags').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/tags/analyze');
+    const data = await response.json();
+    
+    if (data.suggestions && data.suggestions.length > 0) {
+      const suggestionsList = document.getElementById('suggestionsList');
+      suggestionsList.innerHTML = '';
+      
+      data.suggestions.forEach((suggestion, index) => {
+        const confidence = Math.round(suggestion.confidence * 100);
+        const card = document.createElement('div');
+        card.className = 'card mb-3';
+        card.innerHTML = `
+          <div class="card-body">
+            <h5 class="card-title">Suggestion ${index + 1}</h5>
+            <p class="card-text">
+              <strong>Primary Tag:</strong> ${suggestion.primaryTag.name} 
+              (${suggestion.primaryTag.documentCount} documents)
+            </p>
+            <p class="card-text">
+              <strong>Tags to Consolidate:</strong>
+              <ul>
+                ${suggestion.tagsToConsolidate.map(tag => 
+                  `<li>${tag.name} (${tag.documentCount} documents)</li>`
+                ).join('')}
+              </ul>
+            </p>
+            <p class="card-text">
+              <strong>Confidence:</strong> ${confidence}%
+            </p>
+            <button class="btn btn-success consolidate-btn" 
+                    data-suggestion='${JSON.stringify(suggestion)}'>
+              Consolidate Tags
+            </button>
+          </div>
+        `;
+        suggestionsList.appendChild(card);
+      });
+      
+      document.getElementById('analysisResults').classList.remove('d-none');
+      
+      // Add event listeners to consolidate buttons
+      document.querySelectorAll('.consolidate-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const suggestion = JSON.parse(e.target.dataset.suggestion);
+          if (confirm('Are you sure you want to consolidate these tags? This action cannot be undone.')) {
+            try {
+              const response = await fetch('/api/tags/consolidate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(suggestion)
+              });
+              
+              const result = await response.json();
+              if (result.success) {
+                alert(`Successfully consolidated tags. Updated ${result.documentsUpdated} documents.`);
+                // Refresh the analysis
+                document.getElementById('analyzeTags').click();
+              } else {
+                alert('Error consolidating tags: ' + result.errors.map(e => e.error).join(', '));
+              }
+            } catch (error) {
+              alert('Error consolidating tags: ' + error.message);
+            }
+          }
+        });
+      });
+    } else {
+      alert('No consolidation suggestions found.');
+    }
+  } catch (error) {
+    alert('Error analyzing tags: ' + error.message);
+  }
+});
+</script>
+
+<%- include('partials/footer') %> 
