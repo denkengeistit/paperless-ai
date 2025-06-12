@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { TagConsolidationService } = require('../services/tagConsolidationService');
-const { PaperlessService } = require('../services/paperlessService');
+const paperlessService = require('../services/paperlessService');
 
-// Initialize services
-const paperlessService = new PaperlessService();
+// Initialize tag consolidation service
 const tagConsolidationService = new TagConsolidationService(paperlessService);
 
 /**

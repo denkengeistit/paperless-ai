@@ -1,5 +1,5 @@
-const { PaperlessService } = require('./paperlessService');
 const stringSimilarity = require('string-similarity');
+const paperlessService = require('./paperlessService');
 
 class TagConsolidationService {
   constructor(paperlessService) {
