@@ -13,18 +13,28 @@ class TagConsolidationService {
    */
   async analyzeTags() {
     try {
+      console.log('[DEBUG] Starting tag analysis...');
+      
       // Get all tags from Paperless
+      console.log('[DEBUG] Fetching tags from Paperless...');
       const response = await this.paperlessService.client.get('/tags/');
       const tags = response.data.results;
+      console.log(`[DEBUG] Found ${tags.length} tags`);
 
       // Group similar tags
+      console.log('[DEBUG] Finding similar tags...');
       const similarGroups = this.findSimilarTags(tags);
+      console.log(`[DEBUG] Found ${similarGroups.length} similar tag groups`);
       
       // Analyze tag usage
+      console.log('[DEBUG] Analyzing tag usage...');
       const usageAnalysis = await this.analyzeTagUsage(tags);
+      console.log('[DEBUG] Tag usage analysis complete');
 
       // Generate consolidation suggestions
+      console.log('[DEBUG] Generating suggestions...');
       const suggestions = this.generateSuggestions(similarGroups, usageAnalysis);
+      console.log(`[DEBUG] Generated ${suggestions.length} suggestions`);
 
       return {
         similarGroups,

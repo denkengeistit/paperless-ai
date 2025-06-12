@@ -18,8 +18,14 @@ const tagConsolidationService = new TagConsolidationService(paperlessService);
  */
 router.get('/analyze', async (req, res) => {
   try {
+    console.log('[DEBUG] Received request to analyze tags');
     const analysis = await tagConsolidationService.analyzeTags();
-    res.json(analysis);
+    console.log('[DEBUG] Analysis complete, sending response');
+    res.json({
+      suggestions: analysis.suggestions || [],
+      similarGroups: analysis.similarGroups || [],
+      usageAnalysis: analysis.usageAnalysis || {}
+    });
   } catch (error) {
     console.error('[ERROR] analyzing tags:', error);
     res.status(500).json({ error: error.message });
